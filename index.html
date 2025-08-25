@@ -403,12 +403,12 @@
 
                 <div class="control-group">
                     <label for="minTrades">Minimum Trades</label>
-                    <input type="number" id="minTrades" min="1" value="2">
+                    <input type="number" id="minTrades" min="2" max="8" value="2">
                 </div>
 
                 <div class="control-group">
                     <label for="maxTrades">Maximum Trades</label>
-                    <input type="number" id="maxTrades" min="1" value="4">
+                    <input type="number" id="maxTrades" min="2" max="8" value="4">
                 </div>
             </div>
 
@@ -441,17 +441,28 @@
         document.getElementById('maxTrades').addEventListener('input', validateTradeInputs);
 
         function validateTradeInputs() {
-            const minTrades = parseInt(document.getElementById('minTrades').value);
-            const maxTrades = parseInt(document.getElementById('maxTrades').value);
+            let minTrades = parseInt(document.getElementById('minTrades').value);
+            let maxTrades = parseInt(document.getElementById('maxTrades').value);
             
-            if (maxTrades < minTrades) {
-                document.getElementById('maxTrades').value = minTrades;
-            }
             if (minTrades < 2) {
+                minTrades = 2;
                 document.getElementById('minTrades').value = 2;
             }
             if (maxTrades < 2) {
+                maxTrades = 2;
                 document.getElementById('maxTrades').value = 2;
+            }
+            if (minTrades > 8) {
+                minTrades = 8;
+                document.getElementById('minTrades').value = 8;
+            }
+            if (maxTrades > 8) {
+                maxTrades = 8;
+                document.getElementById('maxTrades').value = 8;
+            }
+            if (maxTrades < minTrades) {
+                maxTrades = minTrades;
+                document.getElementById('maxTrades').value = minTrades;
             }
         }
 
