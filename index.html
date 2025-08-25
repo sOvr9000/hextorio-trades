@@ -218,6 +218,19 @@
             gap: 15px;
         }
 
+        .items-involved {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #dee2e6;
+            font-size: 0.9rem;
+            color: #495057;
+            line-height: 1.4;
+        }
+
+        .items-involved strong {
+            color: #2c3e50;
+        }
+
         .info-item {
             text-align: center;
         }
@@ -403,12 +416,12 @@
 
                 <div class="control-group">
                     <label for="minTrades">Minimum Trades</label>
-                    <input type="number" id="minTrades" min="2" max="8" value="2">
+                    <input type="number" id="minTrades" min="1" value="2">
                 </div>
 
                 <div class="control-group">
                     <label for="maxTrades">Maximum Trades</label>
-                    <input type="number" id="maxTrades" min="2" max="8" value="4">
+                    <input type="number" id="maxTrades" min="1" value="4">
                 </div>
             </div>
 
@@ -704,6 +717,17 @@
             processBatch();
         }
 
+        function getItemsInvolved(cycle) {
+            const allItems = new Set();
+            
+            cycle.trades.forEach(trade => {
+                trade.inputs.forEach(item => allItems.add(item.name));
+                trade.outputs.forEach(item => allItems.add(item.name));
+            });
+            
+            return Array.from(allItems).sort();
+        }
+
         function displayLiveResults(cycles) {
             const liveResults = document.getElementById('liveResults');
             if (!liveResults || cycles.length === 0) return;
@@ -717,6 +741,8 @@
                     const y = trade.rect_pos.y;
                     return `[gps=${x},${y},${currentPlanet}]`;
                 });
+
+                const itemsInvolved = getItemsInvolved(cycle);
 
                 html += `
                     <div class="cycle-card">
@@ -746,6 +772,9 @@
                                     </div>
                                     <div class="info-value">${cycle.score.toFixed(1)}</div>
                                 </div>
+                            </div>
+                            <div class="items-involved">
+                                <strong>Items involved:</strong> ${itemsInvolved.join(', ')}
                             </div>
                         </div>
                         <div class="gps-grid">
@@ -784,6 +813,8 @@
                     return `[gps=${x},${y},${currentPlanet}]`;
                 });
 
+                const itemsInvolved = getItemsInvolved(cycle);
+
                 html += `
                     <div class="cycle-card">
                         <div class="cycle-header">
@@ -812,6 +843,9 @@
                                     </div>
                                     <div class="info-value">${cycle.score.toFixed(1)}</div>
                                 </div>
+                            </div>
+                            <div class="items-involved">
+                                <strong>Items involved:</strong> ${itemsInvolved.join(', ')}
                             </div>
                         </div>
                         <div class="gps-grid">
