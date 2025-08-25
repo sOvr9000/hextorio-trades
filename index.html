@@ -231,6 +231,24 @@
             color: #2c3e50;
         }
 
+        .coin-item {
+            color: #667eea;
+            font-weight: bold;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-weight: 700;
+        }
+
+        /* Fallback for browsers that don't support gradient text */
+        @supports not (-webkit-background-clip: text) {
+            .coin-item {
+                color: #667eea;
+                font-weight: 700;
+            }
+        }
+
         .info-item {
             text-align: center;
         }
@@ -728,6 +746,15 @@
             return Array.from(allItems).sort();
         }
 
+        function formatItemsList(items) {
+            return items.map(item => {
+                if (item.endsWith('-coin')) {
+                    return `<span class="coin-item">${item}</span>`;
+                }
+                return item;
+            }).join(', ');
+        }
+
         function displayLiveResults(cycles) {
             const liveResults = document.getElementById('liveResults');
             if (!liveResults || cycles.length === 0) return;
@@ -774,7 +801,7 @@
                                 </div>
                             </div>
                             <div class="items-involved">
-                                <strong>Items involved:</strong> ${itemsInvolved.join(', ')}
+                                <strong>Items involved:</strong> ${formatItemsList(itemsInvolved)}
                             </div>
                         </div>
                         <div class="gps-grid">
@@ -845,7 +872,7 @@
                                 </div>
                             </div>
                             <div class="items-involved">
-                                <strong>Items involved:</strong> ${itemsInvolved.join(', ')}
+                                <strong>Items involved:</strong> ${formatItemsList(itemsInvolved)}
                             </div>
                         </div>
                         <div class="gps-grid">
