@@ -447,6 +447,12 @@
             if (maxTrades < minTrades) {
                 document.getElementById('maxTrades').value = minTrades;
             }
+            if (minTrades < 2) {
+                document.getElementById('minTrades').value = 2;
+            }
+            if (maxTrades < 2) {
+                document.getElementById('maxTrades').value = 2;
+            }
         }
 
         function handleFileSelect(event) {
