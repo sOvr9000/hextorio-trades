@@ -1,0 +1,895 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trade Loop Finder</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1rem;
+        }
+
+        .controls {
+            padding: 30px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .controls-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .control-group label {
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+        }
+
+        .control-group input,
+        .control-group select {
+            padding: 12px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.3s ease;
+        }
+
+        .control-group input:focus,
+        .control-group select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .button-group {
+            text-align: center;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .results {
+            padding: 30px;
+        }
+
+        .status {
+            background: #e3f2fd;
+            border: 1px solid #90caf9;
+            color: #1565c0;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-weight: 500;
+        }
+
+        .status.error {
+            background: #ffebee;
+            border-color: #ef5350;
+            color: #c62828;
+        }
+
+        .status.success {
+            background: #e8f5e8;
+            border-color: #4caf50;
+            color: #2e7d32;
+        }
+
+        .progress-container {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e9ecef;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 15px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .progress-text {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: #2c3e50;
+            font-weight: 500;
+        }
+
+        .stop-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        .stop-btn:hover {
+            background: #c82333;
+        }
+
+        .cycle-card {
+            background: white;
+            border: 2px solid #e9ecef;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .cycle-card:hover {
+            border-color: #667eea;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .cycle-header {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            padding: 20px;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .cycle-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+        }
+
+        .info-item {
+            text-align: center;
+        }
+
+        .info-label {
+            font-size: 0.8rem;
+            color: #6c757d;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+        }
+
+        .info-icon {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            background: #6c757d;
+            color: white;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 14px;
+            font-size: 10px;
+            font-weight: bold;
+            cursor: help;
+            position: relative;
+        }
+
+        .tooltip {
+            visibility: hidden;
+            opacity: 0;
+            position: fixed;
+            background: #2c3e50;
+            color: white;
+            text-transform: none;
+            letter-spacing: normal;
+            padding: 12px 16px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: normal;
+            white-space: normal;
+            max-width: 280px;
+            z-index: 10000;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+            pointer-events: none;
+        }
+
+        .info-value {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: #2c3e50;
+        }
+
+        .gps-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 15px;
+            padding: 20px;
+        }
+
+        .gps-item {
+            display: flex;
+            align-items: center;
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .gps-item:hover {
+            border-color: #667eea;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .gps-text {
+            flex: 1;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            color: #2c3e50;
+            word-break: break-all;
+        }
+
+        .copy-btn {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 15px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 600;
+            transition: background-color 0.3s ease;
+            min-width: 80px;
+        }
+
+        .copy-btn:hover {
+            background: #218838;
+        }
+
+        .copy-btn.copied {
+            background: #17a2b8;
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            display: inline-block;
+            width: 100%;
+        }
+
+        .file-input {
+            width: 100%;
+            padding: 12px;
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            background: #f9f9f9;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .file-input:hover {
+            border-color: #667eea;
+            background: #f0f4ff;
+        }
+
+        .file-input input[type="file"] {
+            position: absolute;
+            opacity: 0;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+        }
+
+        @media (max-width: 768px) {
+            .controls-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .gps-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .cycle-info {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔄 Trade Loop Finder</h1>
+            <p>Find optimal trading cycles with GPS coordinates</p>
+        </div>
+
+        <div class="controls">
+            <div class="controls-grid">
+                <div class="control-group">
+                    <label for="fileInput">Trade Data File</label>
+                    <div class="file-input-wrapper">
+                        <div class="file-input">
+                            <input type="file" id="fileInput" accept=".txt,.json">
+                            <span id="fileLabel">Choose file or drag & drop</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label for="planetSelect">Planet</label>
+                    <select id="planetSelect">
+                        <option value="nauvis">Nauvis</option>
+                        <option value="vulcanus">Vulcanus</option>
+                        <option value="fulgora">Fulgora</option>
+                        <option value="gleba">Gleba</option>
+                        <option value="aquilo">Aquilo</option>
+                    </select>
+                </div>
+
+                <div class="control-group">
+                    <label for="minTrades">Minimum Trades</label>
+                    <input type="number" id="minTrades" min="1" value="2">
+                </div>
+
+                <div class="control-group">
+                    <label for="maxTrades">Maximum Trades</label>
+                    <input type="number" id="maxTrades" min="1" value="4">
+                </div>
+            </div>
+
+            <div class="button-group">
+                <button id="calculateBtn" class="btn">🚀 Calculate Trade Loops</button>
+            </div>
+        </div>
+
+        <div class="results" id="results">
+            <div class="status">
+                Select a trade data file and configure parameters to begin searching for trade loops.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let gameData = null;
+        let currentPlanet = 'nauvis';
+        let searchAborted = false;
+
+        const fileInput = document.getElementById('fileInput');
+        const fileLabel = document.getElementById('fileLabel');
+        const calculateBtn = document.getElementById('calculateBtn');
+        const results = document.getElementById('results');
+
+        // Event listeners
+        fileInput.addEventListener('change', handleFileSelect);
+        calculateBtn.addEventListener('click', calculateTradeLoops);
+        document.getElementById('minTrades').addEventListener('input', validateTradeInputs);
+        document.getElementById('maxTrades').addEventListener('input', validateTradeInputs);
+
+        function validateTradeInputs() {
+            const minTrades = parseInt(document.getElementById('minTrades').value);
+            const maxTrades = parseInt(document.getElementById('maxTrades').value);
+            
+            if (maxTrades < minTrades) {
+                document.getElementById('maxTrades').value = minTrades;
+            }
+        }
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            fileLabel.textContent = file.name;
+            showStatus('Loading file...', 'info');
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const text = e.target.result;
+                    const decodedBytes = atob(text);
+                    const uint8Array = new Uint8Array(decodedBytes.length);
+                    
+                    for (let i = 0; i < decodedBytes.length; i++) {
+                        uint8Array[i] = decodedBytes.charCodeAt(i);
+                    }
+
+                    const decompressed = pako.inflate(uint8Array, { to: 'string' });
+                    gameData = JSON.parse(decompressed);
+
+                    updatePlanetDropdown();
+                    calculateBtn.disabled = false;
+                } catch (error) {
+                    showStatus(`Error loading file: ${error.message}`, 'error');
+                    gameData = null;
+                    calculateBtn.disabled = true;
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function updatePlanetDropdown() {
+            const planetSelect = document.getElementById('planetSelect');
+            planetSelect.innerHTML = '';
+            
+            const availablePlanets = Object.keys(gameData.trades || {});
+            const planetsWithTrades = availablePlanets.filter(planet => {
+                const trades = gameData.trades[planet];
+                return Array.isArray(trades) && trades.length > 0;
+            });
+            
+            if (planetsWithTrades.length === 0) {
+                const option = document.createElement('option');
+                option.value = '';
+                option.textContent = 'No planets with trades found';
+                option.disabled = true;
+                planetSelect.appendChild(option);
+                calculateBtn.disabled = true;
+                showStatus('File loaded, but no planets with trades found.', 'error');
+                return;
+            }
+            
+            planetsWithTrades.forEach(planet => {
+                const option = document.createElement('option');
+                option.value = planet;
+                option.textContent = planet.charAt(0).toUpperCase() + planet.slice(1);
+                planetSelect.appendChild(option);
+            });
+            
+            showStatus(`File loaded successfully! Planets with trades: ${planetsWithTrades.join(', ')}`, 'success');
+        }
+
+        function showStatus(message, type = 'info') {
+            results.innerHTML = `<div class="status ${type}">${message}</div>`;
+        }
+
+        function showProgress() {
+            results.innerHTML = `
+                <div class="progress-container">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <div class="progress-text">
+                        <span id="progressText">Initializing search...</span>
+                        <button class="stop-btn" onclick="stopSearch()">Stop Search</button>
+                    </div>
+                </div>
+                <div id="liveResults"></div>
+            `;
+        }
+
+        function updateProgress(current, total, message) {
+            const progressFill = document.getElementById('progressFill');
+            const progressText = document.getElementById('progressText');
+            
+            if (progressFill && progressText) {
+                const percentage = total > 0 ? (current / total * 100) : 0;
+                progressFill.style.width = `${percentage}%`;
+                progressText.textContent = message;
+            }
+        }
+
+        function stopSearch() {
+            searchAborted = true;
+        }
+
+        function calculateTradeLoops() {
+            if (!gameData) {
+                showStatus('Please select a trade data file first.', 'error');
+                return;
+            }
+
+            currentPlanet = document.getElementById('planetSelect').value;
+            const minTrades = parseInt(document.getElementById('minTrades').value);
+            const maxTrades = parseInt(document.getElementById('maxTrades').value);
+
+            if (!currentPlanet) {
+                showStatus('No valid planets available for calculation.', 'error');
+                return;
+            }
+
+            const planetTrades = gameData.trades[currentPlanet];
+            searchAborted = false;
+            calculateBtn.disabled = true;
+            
+            showProgress();
+            
+            setTimeout(() => {
+                findTradeLoopsProgressive(planetTrades, minTrades, maxTrades);
+            }, 100);
+        }
+
+        function findTradeLoopsProgressive(trades, minTrades, maxTrades) {
+            const tradesByInput = {};
+            trades.forEach(trade => {
+                trade.inputs.forEach(inp => {
+                    if (!tradesByInput[inp.name]) {
+                        tradesByInput[inp.name] = [];
+                    }
+                    tradesByInput[inp.name].push(trade);
+                });
+            });
+
+            const cycles = [];
+            let bestScore = -1;
+            const BATCH_SIZE = 50;
+            let currentTradeIndex = 0;
+
+            function isSimpleTrade(trade) {
+                return trade.inputs.length === 1 && trade.outputs.length === 1;
+            }
+
+            function tradeDistance(trade1, trade2) {
+                const pos1 = trade1.rect_pos;
+                const pos2 = trade2.rect_pos;
+                return Math.abs(pos1.x - pos2.x) + Math.abs(pos1.y - pos2.y);
+            }
+
+            function cycleTotalDistance(cycle) {
+                let dist = 0;
+                for (let i = 0; i < cycle.length; i++) {
+                    const trade1 = cycle[i];
+                    const trade2 = cycle[(i + 1) % cycle.length];
+                    dist += tradeDistance(trade1, trade2);
+                }
+                return dist;
+            }
+
+            function findComplexLoopRec(targetItem, curTrades) {
+                const curItem = curTrades[curTrades.length - 1].outputs[0].name;
+                
+                if (curItem === targetItem && curTrades.length >= minTrades) {
+                    const cycle = [...curTrades];
+                    const dist = cycleTotalDistance(cycle);
+                    const score = 1000 * Math.pow(1.3, cycle.length) / dist;
+                    
+                    if (score > bestScore) {
+                        bestScore = score;
+                        cycles.push({
+                            trades: cycle,
+                            distance: dist,
+                            score: score,
+                            length: cycle.length
+                        });
+                        
+                        cycles.sort((a, b) => b.score - a.score);
+                        if (cycles.length > 10) {
+                            cycles.splice(10);
+                        }
+                    }
+                    return;
+                }
+
+                if (curTrades.length >= maxTrades) return;
+                if (!tradesByInput[curItem]) return;
+
+                for (const nextTrade of tradesByInput[curItem]) {
+                    if (!isSimpleTrade(nextTrade)) continue;
+                    if (curTrades.includes(nextTrade)) continue;
+
+                    curTrades.push(nextTrade);
+                    findComplexLoopRec(targetItem, curTrades);
+                    curTrades.pop();
+                }
+            }
+
+            function processBatch() {
+                if (currentTradeIndex >= trades.length || searchAborted) {
+                    if (searchAborted) {
+                        updateProgress(currentTradeIndex, trades.length, 'Search stopped by user');
+                        showStatus('Search was stopped. Displaying results found so far.', 'info');
+                    } else {
+                        updateProgress(trades.length, trades.length, `Search complete • Found ${cycles.length} cycles`);
+                        showStatus(`Search complete! Found ${cycles.length} trade loops.`, 'success');
+                    }
+                    
+                    calculateBtn.disabled = false;
+                    displayFinalResults(cycles);
+                    return;
+                }
+
+                const batchEnd = Math.min(currentTradeIndex + BATCH_SIZE, trades.length);
+                
+                for (let i = currentTradeIndex; i < batchEnd && !searchAborted; i++) {
+                    const trade = trades[i];
+                    if (!isSimpleTrade(trade)) continue;
+                    
+                    const targetItem = trade.inputs[0].name;
+                    findComplexLoopRec(targetItem, [trade]);
+                }
+
+                currentTradeIndex = batchEnd;
+                
+                updateProgress(
+                    currentTradeIndex, 
+                    trades.length, 
+                    `Processed ${currentTradeIndex}/${trades.length} trades • Found ${cycles.length} cycles`
+                );
+                
+                displayLiveResults(cycles);
+                
+                setTimeout(processBatch, 1);
+            }
+
+            processBatch();
+        }
+
+        function displayLiveResults(cycles) {
+            const liveResults = document.getElementById('liveResults');
+            if (!liveResults || cycles.length === 0) return;
+
+            const topCycles = cycles.slice(0, 3);
+            let html = '';
+            
+            topCycles.forEach((cycle, index) => {
+                const gpsCoords = cycle.trades.map(trade => {
+                    const x = trade.rect_pos.x;
+                    const y = trade.rect_pos.y;
+                    return `[gps=${x},${y},${currentPlanet}]`;
+                });
+
+                html += `
+                    <div class="cycle-card">
+                        <div class="cycle-header">
+                            <div class="cycle-info">
+                                <div class="info-item">
+                                    <div class="info-label">Best #${index + 1}</div>
+                                    <div class="info-value">Live</div>
+                                </div>
+                                <div class="info-item">
+                                    <div class="info-label">Trades</div>
+                                    <div class="info-value">${cycle.length}</div>
+                                </div>
+                                <div class="info-item">
+                                    <div class="info-label">Distance</div>
+                                    <div class="info-value">${cycle.distance.toFixed(0)}</div>
+                                </div>
+                                <div class="info-item">
+                                    <div class="info-label">
+                                        Score
+                                        <span class="info-icon">
+                                            ℹ
+                                            <div class="tooltip">
+                                                Higher score = better bang for buck, accounting for total productivity utilized vs. total distance between trades
+                                            </div>
+                                        </span>
+                                    </div>
+                                    <div class="info-value">${cycle.score.toFixed(1)}</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="gps-grid">
+                            ${gpsCoords.map(gps => `
+                                <div class="gps-item">
+                                    <div class="gps-text">${gps}</div>
+                                    <button class="copy-btn" onclick="copyToClipboard('${gps}', this)">Copy</button>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            });
+
+            liveResults.innerHTML = html;
+            setupTooltips();
+        }
+
+        function displayFinalResults(cycles) {
+            const progressContainer = document.querySelector('.progress-container');
+            if (progressContainer) {
+                progressContainer.style.display = 'none';
+            }
+            
+            if (cycles.length === 0) {
+                showStatus('No trade loops found with the current parameters.', 'error');
+                return;
+            }
+
+            let html = `<div class="status success">Found ${cycles.length} trade loop${cycles.length > 1 ? 's' : ''}!</div>`;
+
+            cycles.forEach((cycle, index) => {
+                const gpsCoords = cycle.trades.map(trade => {
+                    const x = trade.rect_pos.x;
+                    const y = trade.rect_pos.y;
+                    return `[gps=${x},${y},${currentPlanet}]`;
+                });
+
+                html += `
+                    <div class="cycle-card">
+                        <div class="cycle-header">
+                            <div class="cycle-info">
+                                <div class="info-item">
+                                    <div class="info-label">Cycle</div>
+                                    <div class="info-value">#${index + 1}</div>
+                                </div>
+                                <div class="info-item">
+                                    <div class="info-label">Trades</div>
+                                    <div class="info-value">${cycle.length}</div>
+                                </div>
+                                <div class="info-item">
+                                    <div class="info-label">Distance</div>
+                                    <div class="info-value">${cycle.distance.toFixed(0)}</div>
+                                </div>
+                                <div class="info-item">
+                                    <div class="info-label">
+                                        Score
+                                        <span class="info-icon">
+                                            ℹ
+                                            <div class="tooltip">
+                                                Higher score = better bang for buck, accounting for total productivity utilized vs. total distance between trades
+                                            </div>
+                                        </span>
+                                    </div>
+                                    <div class="info-value">${cycle.score.toFixed(1)}</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="gps-grid">
+                            ${gpsCoords.map(gps => `
+                                <div class="gps-item">
+                                    <div class="gps-text">${gps}</div>
+                                    <button class="copy-btn" onclick="copyToClipboard('${gps}', this)">Copy</button>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            });
+
+            results.innerHTML = html;
+            setupTooltips();
+        }
+
+        function setupTooltips() {
+            document.querySelectorAll('.info-icon').forEach(icon => {
+                const tooltip = icon.querySelector('.tooltip');
+                
+                icon.addEventListener('mouseenter', () => {
+                    tooltip.style.visibility = 'visible';
+                    tooltip.style.opacity = '1';
+                    positionTooltip(icon, tooltip);
+                });
+                
+                icon.addEventListener('mouseleave', () => {
+                    tooltip.style.visibility = 'hidden';
+                    tooltip.style.opacity = '0';
+                });
+            });
+        }
+
+        function positionTooltip(icon, tooltip) {
+            const iconRect = icon.getBoundingClientRect();
+            const tooltipRect = tooltip.getBoundingClientRect();
+            
+            let left = iconRect.left + (iconRect.width / 2) - (tooltipRect.width / 2);
+            let top = iconRect.top - tooltipRect.height - 10;
+            
+            if (left < 10) left = 10;
+            if (left + tooltipRect.width > window.innerWidth - 10) {
+                left = window.innerWidth - tooltipRect.width - 10;
+            }
+            if (top < 10) {
+                top = iconRect.bottom + 10;
+            }
+            
+            tooltip.style.left = left + 'px';
+            tooltip.style.top = top + 'px';
+        }
+
+        function copyToClipboard(text, button) {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(() => {
+                    const originalText = button.textContent;
+                    button.textContent = 'Copied!';
+                    button.classList.add('copied');
+                    
+                    setTimeout(() => {
+                        button.textContent = originalText;
+                        button.classList.remove('copied');
+                    }, 2000);
+                }).catch(() => {
+                    fallbackCopyToClipboard(text);
+                });
+            } else {
+                fallbackCopyToClipboard(text);
+            }
+        }
+
+        function fallbackCopyToClipboard(text) {
+            const textArea = document.createElement('textarea');
+            textArea.value = text;
+            textArea.style.position = 'fixed';
+            textArea.style.left = '-999999px';
+            textArea.style.top = '-999999px';
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            
+            try {
+                document.execCommand('copy');
+                alert('GPS coordinates copied to clipboard!');
+            } catch (error) {
+                alert('Failed to copy. Please copy manually: ' + text);
+            }
+            
+            document.body.removeChild(textArea);
+        }
+
+        // Initialize
+        calculateBtn.disabled = true;
+    </script>
+</body>
+</html>
