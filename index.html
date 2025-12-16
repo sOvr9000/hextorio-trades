@@ -1076,7 +1076,7 @@
                     <div class="cycle-table-card">
                         <div class="cycle-compact-header">
                             <div class="cycle-number">#${index + 1} (Live)</div>
-                            <div class="cycle-stats">
+                            <div class="cycle-stats" style="grid-template-columns: 1fr 1fr 1fr;">
                                 <div class="stat-item">
                                     <span class="stat-label">Score:</span>
                                     <span class="stat-value">${cycle.score.toFixed(1)}</span>
@@ -1088,10 +1088,6 @@
                                 <div class="stat-item">
                                     <span class="stat-label">Dist:</span>
                                     <span class="stat-value">${cycle.distance.toFixed(0)}</span>
-                                </div>
-                                <div class="stat-item">
-                                    <span class="stat-label">Trades:</span>
-                                    <span class="stat-value">${cycle.length}</span>
                                 </div>
                             </div>
                             <button class="copy-all-btn" onclick="copyToClipboard(\`${gpsString.replace(/`/g, '\\`')}\`, this)">Copy GPS</button>
@@ -1230,7 +1226,7 @@
                         <div class="cycle-table-card">
                             <div class="cycle-compact-header">
                                 <div class="cycle-number">#${index + 1}</div>
-                                <div class="cycle-stats">
+                                <div class="cycle-stats" style="grid-template-columns: 1fr 1fr 1fr;">
                                     <div class="stat-item">
                                         <span class="stat-label">Score:</span>
                                         <span class="stat-value">${cycle.score.toFixed(1)}</span>
@@ -1242,10 +1238,6 @@
                                     <div class="stat-item">
                                         <span class="stat-label">Dist:</span>
                                         <span class="stat-value">${cycle.distance.toFixed(0)}</span>
-                                    </div>
-                                    <div class="stat-item">
-                                        <span class="stat-label">Trades:</span>
-                                        <span class="stat-value">${cycle.length}</span>
                                     </div>
                                 </div>
                                 <button class="copy-all-btn" onclick="copyToClipboard(\`${gpsString.replace(/`/g, '\\`')}\`, this)">Copy GPS</button>
