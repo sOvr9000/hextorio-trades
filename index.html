@@ -128,25 +128,18 @@
         }
 
         .status {
-            background: #1a2a3a;
-            border: 1px solid #3a5a7a;
             color: #90caf9;
-            padding: 15px;
-            border-radius: 8px;
+            padding: 0;
             margin-bottom: 20px;
             text-align: center;
             font-weight: 500;
         }
 
         .status.error {
-            background: #2a1a1a;
-            border-color: #5a3a3a;
             color: #ef9a9a;
         }
 
         .status.success {
-            background: #1a2a1a;
-            border-color: #3a5a3a;
             color: #81c784;
         }
 
@@ -1125,8 +1118,7 @@
 
             results.innerHTML = `
                 <div class="status success">Found ${cycles.length} trade loop${cycles.length > 1 ? 's' : ''}!</div>
-                <div style="margin-bottom: 15px; display: flex; gap: 10px; align-items: center;">
-                    <strong>Sort by:</strong>
+                <div style="margin-bottom: 15px; display: flex; gap: 10px; align-items: center; justify-content: center;">
                     <button class="sort-btn ${currentSortBy === 'score' ? 'active' : ''}" onclick="changeSortBy('score')">
                         Score ${getSortIcon('score')}
                     </button>
