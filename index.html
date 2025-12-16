@@ -500,6 +500,55 @@
             border-top: 1px solid #e9ecef;
         }
 
+        .info-section {
+            background: #f8f9fa;
+            padding: 20px 30px;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .info-section h3 {
+            color: #2c3e50;
+            font-size: 1rem;
+            margin-bottom: 12px;
+            font-weight: 600;
+        }
+
+        .metric-descriptions {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .metric-desc {
+            background: white;
+            padding: 12px;
+            border-radius: 6px;
+            border-left: 4px solid #667eea;
+        }
+
+        .metric-desc strong {
+            color: #667eea;
+            font-size: 0.9rem;
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        .metric-desc span {
+            color: #495057;
+            font-size: 0.85rem;
+            line-height: 1.4;
+        }
+
+        .formula {
+            font-family: 'Courier New', Consolas, Monaco, monospace;
+            background: #f0f4ff;
+            color: #667eea;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 0.9em;
+            font-weight: 600;
+        }
+
         @media (max-width: 768px) {
             .controls-grid {
                 grid-template-columns: 1fr;
@@ -524,6 +573,24 @@
         <div class="header">
             <h1>🔄 Trade Loop Finder</h1>
             <p>Find optimal trading cycles with GPS coordinates</p>
+        </div>
+
+        <div class="info-section">
+            <h3>📊 Metric Guide</h3>
+            <div class="metric-descriptions">
+                <div class="metric-desc">
+                    <strong>Score</strong>
+                    <span>Overall efficiency rating. Higher is better. Calculated as <code class="formula">yield / sqrt(distance)</code>.</span>
+                </div>
+                <div class="metric-desc">
+                    <strong>Yield</strong>
+                    <span>Net profit per cycle in hex-coin value, accounting for productivity bonuses.</span>
+                </div>
+                <div class="metric-desc">
+                    <strong>Dist (Distance)</strong>
+                    <span>Total travel distance between all trades in the loop (Manhattan distance).</span>
+                </div>
+            </div>
         </div>
 
         <div class="controls">
