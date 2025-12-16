@@ -850,29 +850,77 @@
             }
 
             function calculateCycleYield(cycle) {
-                let totalYield = 0;
                 const itemValues = gameData.item_values[currentPlanet] || {};
 
-                for (const trade of cycle) {
-                    let outputValue = 0;
-                    let inputValue = 0;
+                // Find all items in the cycle
+                const allItems = new Set();
+                cycle.forEach(trade => {
+                    trade.inputs.forEach(item => allItems.add(item.name));
+                    trade.outputs.forEach(item => allItems.add(item.name));
+                });
 
-                    // Calculate output value with productivity bonus
-                    for (const output of trade.outputs) {
-                        const value = itemValues[output.name] || 0;
-                        outputValue += output.count * (1 + trade.productivity) * value;
+                // Find the most expensive item in the loop
+                let mostExpensiveItem = null;
+                let maxValue = -1;
+                for (const item of allItems) {
+                    const value = itemValues[item] || 0;
+                    if (value > maxValue) {
+                        maxValue = value;
+                        mostExpensiveItem = item;
                     }
-
-                    // Calculate input value
-                    for (const input of trade.inputs) {
-                        const value = itemValues[input.name] || 0;
-                        inputValue += input.count * value;
-                    }
-
-                    totalYield += outputValue - inputValue;
                 }
 
-                return totalYield;
+                if (!mostExpensiveItem || maxValue <= 0) {
+                    return 0; // No valid items found
+                }
+
+                // Start with 1 unit of the most expensive item and trace through the loop
+                let inventory = { [mostExpensiveItem]: 1 };
+
+                for (const trade of cycle) {
+                    // Calculate how many times we can run this trade based on available inputs
+                    let runCount = Infinity;
+                    let canRun = false;
+
+                    for (const input of trade.inputs) {
+                        const available = inventory[input.name] || 0;
+                        if (available > 0) {
+                            canRun = true;
+                            runCount = Math.min(runCount, available / input.count);
+                        }
+                    }
+
+                    if (!canRun || runCount === 0) {
+                        continue; // Skip if we can't run this trade
+                    }
+
+                    // Consume inputs
+                    for (const input of trade.inputs) {
+                        inventory[input.name] = (inventory[input.name] || 0) - input.count * runCount;
+                        if (Math.abs(inventory[input.name]) <= 1e-10) {
+                            delete inventory[input.name];
+                        }
+                    }
+
+                    // Produce outputs with productivity bonus
+                    for (const output of trade.outputs) {
+                        inventory[output.name] = (inventory[output.name] || 0) +
+                            output.count * (1 + trade.productivity) * runCount;
+                    }
+                }
+
+                // Calculate total value of inventory
+                let totalValue = 0;
+                for (const [item, amount] of Object.entries(inventory)) {
+                    totalValue += amount * (itemValues[item] || 0);
+                }
+
+                // Calculate multiplier: how much value we have now vs what we started with
+                const multiplier = totalValue / maxValue;
+
+                // Yield is the gain multiplier * value of the most expensive item
+                // (multiplier - 1) represents the return, then multiply by item value
+                return (multiplier - 1) * maxValue;
             }
 
             function getCycleSignature(cycle) {
@@ -906,7 +954,7 @@
                     const cycle = [...curTrades];
                     const dist = cycleTotalDistance(cycle);
                     const cycleYield = calculateCycleYield(cycle);
-                    const score = cycleYield / Math.sqrt(dist);
+                    const score = (cycleYield / Math.sqrt(dist)) * 10;
 
                     cycles.push({
                         trades: cycle,
@@ -1035,7 +1083,7 @@
                                 </div>
                                 <div class="stat-item">
                                     <span class="stat-label">Yield:</span>
-                                    <span class="stat-value">${cycle.yield.toFixed(0)}</span>
+                                    <span class="stat-value">${cycle.yield.toFixed(1)}</span>
                                 </div>
                                 <div class="stat-item">
                                     <span class="stat-label">Dist:</span>
@@ -1189,7 +1237,7 @@
                                     </div>
                                     <div class="stat-item">
                                         <span class="stat-label">Yield:</span>
-                                        <span class="stat-value">${cycle.yield.toFixed(0)}</span>
+                                        <span class="stat-value">${cycle.yield.toFixed(1)}</span>
                                     </div>
                                     <div class="stat-item">
                                         <span class="stat-label">Dist:</span>
