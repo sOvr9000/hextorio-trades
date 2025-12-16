@@ -387,17 +387,134 @@
             cursor: pointer;
         }
 
+        .sort-btn {
+            background: white;
+            border: 2px solid #e9ecef;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .sort-btn:hover {
+            border-color: #667eea;
+            background: #f0f4ff;
+        }
+
+        .sort-btn.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-color: #667eea;
+        }
+
+        .cycles-table {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 15px;
+        }
+
+        .cycle-table-card {
+            background: white;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .cycle-table-card:hover {
+            border-color: #667eea;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            transform: translateY(-2px);
+        }
+
+        .cycle-compact-header {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .cycle-number {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: #2c3e50;
+            text-align: center;
+        }
+
+        .cycle-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            font-size: 0.85rem;
+        }
+
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 4px 8px;
+            background: white;
+            border-radius: 4px;
+        }
+
+        .stat-label {
+            color: #6c757d;
+            font-weight: 500;
+        }
+
+        .stat-value {
+            color: #2c3e50;
+            font-weight: 700;
+        }
+
+        .copy-all-btn {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .copy-all-btn:hover {
+            background: #218838;
+            transform: scale(1.02);
+        }
+
+        .copy-all-btn.copied {
+            background: #17a2b8;
+        }
+
+        .cycle-items {
+            padding: 12px;
+            font-size: 0.85rem;
+            color: #495057;
+            line-height: 1.4;
+            background: white;
+            border-top: 1px solid #e9ecef;
+        }
+
         @media (max-width: 768px) {
             .controls-grid {
                 grid-template-columns: 1fr;
             }
-            
+
             .gps-grid {
                 grid-template-columns: 1fr;
             }
-            
+
             .cycle-info {
                 grid-template-columns: 1fr 1fr;
+            }
+
+            .cycles-table {
+                grid-template-columns: 1fr;
             }
         }
     </style>
@@ -621,8 +738,19 @@
         }
 
         function findTradeLoopsProgressive(trades, minTrades, maxTrades) {
+            function isSimpleTrade(trade) {
+                return trade.inputs.length === 1 && trade.outputs.length === 1;
+            }
+
+            // Filter out sink and generator trades
+            const filteredTrades = trades.filter(trade => {
+                return trade.mode !== 'sink' && trade.mode !== 'generator';
+            });
+
+            console.log(`Filtered ${trades.length - filteredTrades.length} sink/generator trades. Processing ${filteredTrades.length} normal trades.`);
+
             const tradesByInput = {};
-            trades.forEach(trade => {
+            filteredTrades.forEach(trade => {
                 trade.inputs.forEach(inp => {
                     if (!tradesByInput[inp.name]) {
                         tradesByInput[inp.name] = [];
@@ -631,14 +759,11 @@
                 });
             });
 
+
             const cycles = [];
-            let bestScore = -1;
             const BATCH_SIZE = 50;
             let currentTradeIndex = 0;
-
-            function isSimpleTrade(trade) {
-                return trade.inputs.length === 1 && trade.outputs.length === 1;
-            }
+            let totalSimpleTrades = 0;
 
             function tradeDistance(trade1, trade2) {
                 const pos1 = trade1.rect_pos;
@@ -656,28 +781,73 @@
                 return dist;
             }
 
+            function calculateCycleYield(cycle) {
+                let totalYield = 0;
+                const itemValues = gameData.item_values[currentPlanet] || {};
+
+                for (const trade of cycle) {
+                    let outputValue = 0;
+                    let inputValue = 0;
+
+                    // Calculate output value with productivity bonus
+                    for (const output of trade.outputs) {
+                        const value = itemValues[output.name] || 0;
+                        outputValue += output.count * (1 + trade.productivity) * value;
+                    }
+
+                    // Calculate input value
+                    for (const input of trade.inputs) {
+                        const value = itemValues[input.name] || 0;
+                        inputValue += input.count * value;
+                    }
+
+                    totalYield += outputValue - inputValue;
+                }
+
+                return totalYield;
+            }
+
+            function getCycleSignature(cycle) {
+                // Create a unique signature for a cycle based on the sorted positions of its trades
+                // This allows us to detect cycles that are the same but start at different points
+                const positions = cycle.trades.map(trade => `${trade.axial_pos.q},${trade.axial_pos.r}`);
+                positions.sort();
+                return positions.join('|');
+            }
+
+            function deduplicateCycles(cycles) {
+                const seen = new Map();
+                const unique = [];
+
+                for (const cycle of cycles) {
+                    const signature = getCycleSignature(cycle);
+
+                    if (!seen.has(signature)) {
+                        seen.set(signature, true);
+                        unique.push(cycle);
+                    }
+                }
+
+                return unique;
+            }
+
             function findComplexLoopRec(targetItem, curTrades) {
                 const curItem = curTrades[curTrades.length - 1].outputs[0].name;
-                
+
                 if (curItem === targetItem && curTrades.length >= minTrades) {
                     const cycle = [...curTrades];
                     const dist = cycleTotalDistance(cycle);
-                    const score = 1000 * Math.pow(1.3, cycle.length) / dist;
-                    
-                    if (score > bestScore) {
-                        bestScore = score;
-                        cycles.push({
-                            trades: cycle,
-                            distance: dist,
-                            score: score,
-                            length: cycle.length
-                        });
-                        
-                        cycles.sort((a, b) => b.score - a.score);
-                        if (cycles.length > 10) {
-                            cycles.splice(10);
-                        }
-                    }
+                    const cycleYield = calculateCycleYield(cycle);
+                    const score = cycleYield / Math.sqrt(dist);
+
+                    cycles.push({
+                        trades: cycle,
+                        distance: dist,
+                        score: score,
+                        yield: cycleYield,
+                        length: cycle.length
+                    });
+
                     return;
                 }
 
@@ -695,40 +865,51 @@
             }
 
             function processBatch() {
-                if (currentTradeIndex >= trades.length || searchAborted) {
+                if (currentTradeIndex >= filteredTrades.length || searchAborted) {
+                    // Deduplicate cycles
+                    const uniqueCycles = deduplicateCycles(cycles);
+                    console.log(`Found ${cycles.length} cycles (${uniqueCycles.length} unique after deduplication)`);
+
+                    // Sort all cycles by score (best first)
+                    uniqueCycles.sort((a, b) => b.score - a.score);
+
                     if (searchAborted) {
-                        updateProgress(currentTradeIndex, trades.length, 'Search stopped by user');
+                        updateProgress(currentTradeIndex, filteredTrades.length, 'Search stopped by user');
                         showStatus('Search was stopped. Displaying results found so far.', 'info');
                     } else {
-                        updateProgress(trades.length, trades.length, `Search complete • Found ${cycles.length} cycles`);
-                        showStatus(`Search complete! Found ${cycles.length} trade loops.`, 'success');
+                        updateProgress(filteredTrades.length, filteredTrades.length, `Search complete • Found ${uniqueCycles.length} unique cycles`);
+                        showStatus(`Search complete! Found ${uniqueCycles.length} unique trade loops.`, 'success');
                     }
-                    
+
                     calculateBtn.disabled = false;
-                    displayFinalResults(cycles);
+                    displayFinalResults(uniqueCycles);
                     return;
                 }
 
-                const batchEnd = Math.min(currentTradeIndex + BATCH_SIZE, trades.length);
-                
+                const batchEnd = Math.min(currentTradeIndex + BATCH_SIZE, filteredTrades.length);
+
                 for (let i = currentTradeIndex; i < batchEnd && !searchAborted; i++) {
-                    const trade = trades[i];
+                    const trade = filteredTrades[i];
                     if (!isSimpleTrade(trade)) continue;
-                    
+
+                    totalSimpleTrades++;
                     const targetItem = trade.inputs[0].name;
                     findComplexLoopRec(targetItem, [trade]);
                 }
 
                 currentTradeIndex = batchEnd;
-                
+
+                // Deduplicate for live display
+                const uniqueCyclesLive = deduplicateCycles(cycles);
+
                 updateProgress(
-                    currentTradeIndex, 
-                    trades.length, 
-                    `Processed ${currentTradeIndex}/${trades.length} trades • Found ${cycles.length} cycles`
+                    currentTradeIndex,
+                    filteredTrades.length,
+                    `Processed ${currentTradeIndex}/${filteredTrades.length} trades • Found ${uniqueCyclesLive.length} unique cycles`
                 );
-                
-                displayLiveResults(cycles);
-                
+
+                displayLiveResults(uniqueCyclesLive);
+
                 setTimeout(processBatch, 1);
             }
 
@@ -759,65 +940,93 @@
             const liveResults = document.getElementById('liveResults');
             if (!liveResults || cycles.length === 0) return;
 
-            const topCycles = cycles.slice(0, 3);
-            let html = '';
-            
+            // Sort and show top 20 during live update
+            const sortedCycles = [...cycles].sort((a, b) => b.score - a.score);
+            const topCycles = sortedCycles.slice(0, 20);
+
+            let html = '<div class="cycles-table">';
+
             topCycles.forEach((cycle, index) => {
                 const gpsCoords = cycle.trades.map(trade => {
                     const x = trade.rect_pos.x;
                     const y = trade.rect_pos.y;
                     return `[gps=${x},${y},${currentPlanet}]`;
                 });
+                const gpsString = gpsCoords.join('');
 
                 const itemsInvolved = getItemsInvolved(cycle);
 
                 html += `
-                    <div class="cycle-card">
-                        <div class="cycle-header">
-                            <div class="cycle-info">
-                                <div class="info-item">
-                                    <div class="info-label">Best #${index + 1}</div>
-                                    <div class="info-value">Live</div>
+                    <div class="cycle-table-card">
+                        <div class="cycle-compact-header">
+                            <div class="cycle-number">#${index + 1} (Live)</div>
+                            <div class="cycle-stats">
+                                <div class="stat-item">
+                                    <span class="stat-label">Score:</span>
+                                    <span class="stat-value">${cycle.score.toFixed(1)}</span>
                                 </div>
-                                <div class="info-item">
-                                    <div class="info-label">Trades</div>
-                                    <div class="info-value">${cycle.length}</div>
+                                <div class="stat-item">
+                                    <span class="stat-label">Yield:</span>
+                                    <span class="stat-value">${cycle.yield.toFixed(0)}</span>
                                 </div>
-                                <div class="info-item">
-                                    <div class="info-label">Distance</div>
-                                    <div class="info-value">${cycle.distance.toFixed(0)}</div>
+                                <div class="stat-item">
+                                    <span class="stat-label">Dist:</span>
+                                    <span class="stat-value">${cycle.distance.toFixed(0)}</span>
                                 </div>
-                                <div class="info-item">
-                                    <div class="info-label">
-                                        Score
-                                        <span class="info-icon">
-                                            ℹ
-                                            <div class="tooltip">
-                                                Higher score = better bang for buck, accounting for total productivity utilized vs. total distance between trades
-                                            </div>
-                                        </span>
-                                    </div>
-                                    <div class="info-value">${cycle.score.toFixed(1)}</div>
+                                <div class="stat-item">
+                                    <span class="stat-label">Trades:</span>
+                                    <span class="stat-value">${cycle.length}</span>
                                 </div>
                             </div>
-                            <div class="items-involved">
-                                <strong>Items involved:</strong> ${formatItemsList(itemsInvolved)}
-                            </div>
+                            <button class="copy-all-btn" onclick="copyToClipboard(\`${gpsString.replace(/`/g, '\\`')}\`, this)">📋 Copy GPS</button>
                         </div>
-                        <div class="gps-grid">
-                            ${gpsCoords.map(gps => `
-                                <div class="gps-item">
-                                    <div class="gps-text">${gps}</div>
-                                    <button class="copy-btn" onclick="copyToClipboard('${gps}', this)">Copy</button>
-                                </div>
-                            `).join('')}
+                        <div class="cycle-items">
+                            ${formatItemsList(itemsInvolved)}
                         </div>
                     </div>
                 `;
             });
 
+            html += '</div>';
             liveResults.innerHTML = html;
-            setupTooltips();
+        }
+
+        let currentSortBy = 'score'; // 'score', 'distance', 'yield'
+        let currentSortOrder = 'desc'; // 'asc' or 'desc'
+        let allCycles = [];
+
+        function sortCycles() {
+            const sorted = [...allCycles];
+            sorted.sort((a, b) => {
+                let valA, valB;
+                if (currentSortBy === 'score') {
+                    valA = a.score;
+                    valB = b.score;
+                } else if (currentSortBy === 'distance') {
+                    valA = a.distance;
+                    valB = b.distance;
+                } else if (currentSortBy === 'yield') {
+                    valA = a.yield;
+                    valB = b.yield;
+                }
+
+                if (currentSortOrder === 'asc') {
+                    return valA - valB;
+                } else {
+                    return valB - valA;
+                }
+            });
+            return sorted;
+        }
+
+        function changeSortBy(sortBy) {
+            if (currentSortBy === sortBy) {
+                currentSortOrder = currentSortOrder === 'desc' ? 'asc' : 'desc';
+            } else {
+                currentSortBy = sortBy;
+                currentSortOrder = 'desc';
+            }
+            displayFinalResults(allCycles);
         }
 
         function displayFinalResults(cycles) {
@@ -825,70 +1034,138 @@
             if (progressContainer) {
                 progressContainer.style.display = 'none';
             }
-            
+
             if (cycles.length === 0) {
                 showStatus('No trade loops found with the current parameters.', 'error');
                 return;
             }
 
-            let html = `<div class="status success">Found ${cycles.length} trade loop${cycles.length > 1 ? 's' : ''}!</div>`;
+            allCycles = cycles;
 
-            cycles.forEach((cycle, index) => {
-                const gpsCoords = cycle.trades.map(trade => {
-                    const x = trade.rect_pos.x;
-                    const y = trade.rect_pos.y;
-                    return `[gps=${x},${y},${currentPlanet}]`;
-                });
+            // Show loading message
+            const getSortIcon = (field) => {
+                if (currentSortBy !== field) return '↕';
+                return currentSortOrder === 'desc' ? '↓' : '↑';
+            };
 
-                const itemsInvolved = getItemsInvolved(cycle);
-
-                html += `
-                    <div class="cycle-card">
-                        <div class="cycle-header">
-                            <div class="cycle-info">
-                                <div class="info-item">
-                                    <div class="info-label">Cycle</div>
-                                    <div class="info-value">#${index + 1}</div>
-                                </div>
-                                <div class="info-item">
-                                    <div class="info-label">Trades</div>
-                                    <div class="info-value">${cycle.length}</div>
-                                </div>
-                                <div class="info-item">
-                                    <div class="info-label">Distance</div>
-                                    <div class="info-value">${cycle.distance.toFixed(0)}</div>
-                                </div>
-                                <div class="info-item">
-                                    <div class="info-label">
-                                        Score
-                                        <span class="info-icon">
-                                            ℹ
-                                            <div class="tooltip">
-                                                Higher score = better bang for buck, accounting for total productivity utilized vs. total distance between trades
-                                            </div>
-                                        </span>
-                                    </div>
-                                    <div class="info-value">${cycle.score.toFixed(1)}</div>
-                                </div>
-                            </div>
-                            <div class="items-involved">
-                                <strong>Items involved:</strong> ${formatItemsList(itemsInvolved)}
-                            </div>
-                        </div>
-                        <div class="gps-grid">
-                            ${gpsCoords.map(gps => `
-                                <div class="gps-item">
-                                    <div class="gps-text">${gps}</div>
-                                    <button class="copy-btn" onclick="copyToClipboard('${gps}', this)">Copy</button>
-                                </div>
-                            `).join('')}
-                        </div>
+            results.innerHTML = `
+                <div class="status success">Found ${cycles.length} trade loop${cycles.length > 1 ? 's' : ''}!</div>
+                <div style="margin-bottom: 15px; display: flex; gap: 10px; align-items: center;">
+                    <strong>Sort by:</strong>
+                    <button class="sort-btn ${currentSortBy === 'score' ? 'active' : ''}" onclick="changeSortBy('score')">
+                        Score ${getSortIcon('score')}
+                    </button>
+                    <button class="sort-btn ${currentSortBy === 'yield' ? 'active' : ''}" onclick="changeSortBy('yield')">
+                        Yield ${getSortIcon('yield')}
+                    </button>
+                    <button class="sort-btn ${currentSortBy === 'distance' ? 'active' : ''}" onclick="changeSortBy('distance')">
+                        Distance ${getSortIcon('distance')}
+                    </button>
+                </div>
+                <div class="progress-container">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="renderProgressFill"></div>
                     </div>
-                `;
-            });
+                    <div class="progress-text">
+                        <span id="renderProgressText">Sorting and rendering results...</span>
+                    </div>
+                </div>
+                <div class="cycles-table" id="cyclesTableContainer"></div>
+            `;
 
-            results.innerHTML = html;
-            setupTooltips();
+            // Start progressive rendering
+            setTimeout(() => renderCyclesProgressively(), 10);
+        }
+
+        function renderCyclesProgressively() {
+            const container = document.getElementById('cyclesTableContainer');
+            const progressFill = document.getElementById('renderProgressFill');
+            const progressText = document.getElementById('renderProgressText');
+
+            // First, sort asynchronously
+            if (progressText) {
+                progressText.textContent = 'Sorting cycles...';
+            }
+
+            setTimeout(() => {
+                const sortedCycles = sortCycles();
+
+                if (progressText) {
+                    progressText.textContent = 'Rendering cycles...';
+                }
+
+                const BATCH_SIZE = 100;
+                let currentIndex = 0;
+
+                function renderBatch() {
+                const batchEnd = Math.min(currentIndex + BATCH_SIZE, sortedCycles.length);
+                let html = '';
+
+                for (let index = currentIndex; index < batchEnd; index++) {
+                    const cycle = sortedCycles[index];
+                    const gpsCoords = cycle.trades.map(trade => {
+                        const x = trade.rect_pos.x;
+                        const y = trade.rect_pos.y;
+                        return `[gps=${x},${y},${currentPlanet}]`;
+                    });
+                    const gpsString = gpsCoords.join('');
+                    const itemsInvolved = getItemsInvolved(cycle);
+
+                    html += `
+                        <div class="cycle-table-card">
+                            <div class="cycle-compact-header">
+                                <div class="cycle-number">#${index + 1}</div>
+                                <div class="cycle-stats">
+                                    <div class="stat-item">
+                                        <span class="stat-label">Score:</span>
+                                        <span class="stat-value">${cycle.score.toFixed(1)}</span>
+                                    </div>
+                                    <div class="stat-item">
+                                        <span class="stat-label">Yield:</span>
+                                        <span class="stat-value">${cycle.yield.toFixed(0)}</span>
+                                    </div>
+                                    <div class="stat-item">
+                                        <span class="stat-label">Dist:</span>
+                                        <span class="stat-value">${cycle.distance.toFixed(0)}</span>
+                                    </div>
+                                    <div class="stat-item">
+                                        <span class="stat-label">Trades:</span>
+                                        <span class="stat-value">${cycle.length}</span>
+                                    </div>
+                                </div>
+                                <button class="copy-all-btn" onclick="copyToClipboard(\`${gpsString.replace(/`/g, '\\`')}\`, this)">📋 Copy GPS</button>
+                            </div>
+                            <div class="cycle-items">
+                                ${formatItemsList(itemsInvolved)}
+                            </div>
+                        </div>
+                    `;
+                }
+
+                container.insertAdjacentHTML('beforeend', html);
+                currentIndex = batchEnd;
+
+                // Update progress
+                const percentage = (currentIndex / sortedCycles.length) * 100;
+                if (progressFill && progressText) {
+                    progressFill.style.width = `${percentage}%`;
+                    progressText.textContent = `Rendering ${currentIndex} / ${sortedCycles.length} cycles...`;
+                }
+
+                // Continue or finish
+                if (currentIndex < sortedCycles.length) {
+                    setTimeout(renderBatch, 1);
+                } else {
+                    // Remove progress bar when done
+                    const progressContainer = document.querySelector('.progress-container');
+                    if (progressContainer) {
+                        progressContainer.style.display = 'none';
+                    }
+                }
+                }
+
+                renderBatch();
+            }, 10);
         }
 
         function setupTooltips() {
