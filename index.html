@@ -640,6 +640,7 @@
         </div>
     </div>
 
+    <script src="trade-model.js"></script>
     <script>
         let gameData = null;
         let currentPlanet = 'nauvis';
@@ -806,16 +807,10 @@
         }
 
         function findTradeLoopsProgressive(trades, minTrades, maxTrades) {
-            function isSimpleTrade(trade) {
-                return trade.inputs.length === 1 && trade.outputs.length === 1;
-            }
+            // Filter before indexing so empty object-shaped sides are never iterated.
+            const filteredTrades = trades.filter(TradeModel.isSimpleTrade);
 
-            // Filter out sink and generator trades
-            const filteredTrades = trades.filter(trade => {
-                return trade.mode !== 'sink' && trade.mode !== 'generator';
-            });
-
-            console.log(`Filtered ${trades.length - filteredTrades.length} sink/generator trades. Processing ${filteredTrades.length} normal trades.`);
+            console.log(`Filtered ${trades.length - filteredTrades.length} sink/generator, empty, or non-simple trades. Processing ${filteredTrades.length} simple trades.`);
 
             const tradesByInput = {};
             filteredTrades.forEach(trade => {
@@ -831,7 +826,6 @@
             const cycles = [];
             const BATCH_SIZE = 50;
             let currentTradeIndex = 0;
-            let totalSimpleTrades = 0;
 
             function tradeDistance(trade1, trade2) {
                 const pos1 = trade1.rect_pos;
@@ -853,11 +847,7 @@
                 const itemValues = gameData.item_values[currentPlanet] || {};
 
                 // Find all items in the cycle
-                const allItems = new Set();
-                cycle.forEach(trade => {
-                    trade.inputs.forEach(item => allItems.add(item.name));
-                    trade.outputs.forEach(item => allItems.add(item.name));
-                });
+                const allItems = TradeModel.getItemNames(cycle);
 
                 // Find the most expensive item in the loop
                 let mostExpensiveItem = null;
@@ -971,7 +961,6 @@
                 if (!tradesByInput[curItem]) return;
 
                 for (const nextTrade of tradesByInput[curItem]) {
-                    if (!isSimpleTrade(nextTrade)) continue;
                     if (curTrades.includes(nextTrade)) continue;
 
                     curTrades.push(nextTrade);
@@ -1006,9 +995,6 @@
 
                 for (let i = currentTradeIndex; i < batchEnd && !searchAborted; i++) {
                     const trade = filteredTrades[i];
-                    if (!isSimpleTrade(trade)) continue;
-
-                    totalSimpleTrades++;
                     const targetItem = trade.inputs[0].name;
                     findComplexLoopRec(targetItem, [trade]);
                 }
@@ -1033,14 +1019,7 @@
         }
 
         function getItemsInvolved(cycle) {
-            const allItems = new Set();
-            
-            cycle.trades.forEach(trade => {
-                trade.inputs.forEach(item => allItems.add(item.name));
-                trade.outputs.forEach(item => allItems.add(item.name));
-            });
-            
-            return Array.from(allItems).sort();
+            return TradeModel.getItemNames(cycle.trades).sort();
         }
 
         function formatItemsList(items) {
